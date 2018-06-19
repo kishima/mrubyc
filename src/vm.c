@@ -1835,6 +1835,9 @@ int mrbc_vm_run( mrb_vm *vm )
       console_printf("Skip OP=%02x\n", GET_OPCODE(code));
       break;
     }
+	if( (vm->abort_point & 0x8000) && ( (vm->abort_point & 0x7FFF) == vm->callinfo_top ) ){
+		vm->flag_preemption=1;
+	}
   } while( !vm->flag_preemption );
 
   vm->flag_preemption = 0;

@@ -437,9 +437,41 @@ static void c_object_class(mrb_vm *vm, mrb_value v[], int argc)
 // Object.new
 static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 {
-  *v = mrbc_instance_new(vm, v->cls, 0);
-  // call "initialize"
-  mrbc_funcall(vm, "initialize", v, argc);
+  mrb_value new_obj = mrbc_instance_new(vm, v->cls, 0);
+
+  mrb_sym sym_id = str_to_symid("initialize");
+  mrb_proc *m = find_method(vm, new_obj, sym_id);
+
+  uint16_t diff = v - vm->regs + 1 + argc;
+  
+  vm->abort_point = 0x8000 | vm->callinfo_top;
+  mrbc_push_callinfo(vm, diff);
+
+  mrb_value* input_regs = vm->current_regs;
+
+  vm->current_regs += diff;
+
+  vm->pc = 0;
+  vm->pc_irep = m->irep;
+
+  mrb_value *regs = vm->current_regs;
+
+  mrbc_release(&regs[0]);
+  regs[0] = new_obj;
+  mrbc_dup(&new_obj);
+
+  int n=0;
+  for(n=0;n<argc;n++){
+    mrbc_release(&regs[n+1]);
+    regs[n+1] = input_regs[v - vm->regs + n +1];
+    mrbc_dup(&regs[n+1]);
+  }
+
+  mrbc_vm_run(vm);
+
+  vm->abort_point = 0;
+
+  SET_RETURN(new_obj);
 }
 
 

@@ -70,6 +70,7 @@ typedef struct VM {
   mrb_irep *pc_irep;    // PC
   uint16_t  pc;         // PC
 
+  uint16_t  abort_point;
   //  uint16_t     reg_top;
   mrb_value    regs[MAX_REGS_SIZE];
   mrb_value   *current_regs;
