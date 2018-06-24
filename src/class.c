@@ -435,16 +435,11 @@ static void c_object_class(mrb_vm *vm, mrb_value v[], int argc)
 #endif
 }
 
+//#define RDEBUG
+
 // Object.new
 static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 {
-#if 0
-	printf("initialize object!\n");
-  *v = mrbc_instance_new(vm, v->cls, 0);
-  // call "initialize"
-  mrbc_funcall(vm, "initialize", v, argc);
-return;
-#else
 	// SENDからは下記のように呼ばれる
 	//    m->func(vm, regs + ra, rc);
 	// v[]にはレジスタがシフトしたものが入っている
@@ -453,9 +448,10 @@ return;
 	vm->current_regs = v;
 	
 	//普通にVM呼ぶと最後まで実行しようとしてしまうので、ABORTで無理矢理中断させることで、ブロックを表現する
+#ifdef RDEBUG
 	printf("------------------------------------------------c_object_new argc=%d\n",argc);
 	print_vm_info(vm);
-
+#endif
 	//v==self
 	mrb_value new_obj = mrbc_instance_new(vm, v->cls, 0);
 
@@ -463,12 +459,16 @@ return;
 	
 	mrb_sym sym_id = str_to_symid(inifunc);
 	mrb_proc *m = find_method(vm, new_obj, sym_id);
+#ifdef RDEBUG
 	printf("sym_id=%d\n",sym_id);
+#endif
 	int x=0;
 	for(x=0;x<100;x++){
 		const char* name = mrbc_get_irep_symbol(m->irep->ptr_to_sym,x);
 		if(name==NULL)break;
+#ifdef RDEBUG
 		printf("irep symname=%s\n",name);
+#endif
 	}
 	
 	char symlist[]="XXXXYYinitialize";
@@ -520,7 +520,9 @@ return;
 	vm->pc_irep = &irep;//InitializeメソッドのIrep
 	 
 	
+#ifdef RDEBUG
 	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> mrbc_vm_run   diff=%d\n",diff);
+#endif
 	// OP_CALLはレジスタの位置をずらさないで、そのままreg[0].proc->irepをpc_irepに持ってくる
 	// reg[0]にprocオブジェクトが設定されている前提。regs[0]に実行したいprocオブジェクトを置けばOK
 
@@ -545,15 +547,15 @@ return;
 	regs[1] = new_obj;
 	mrbc_dup(&new_obj); //RETURNで参照が減らされるので足しておく
 	
-	printf("--- run vm\n");
 	mrbc_vm_run(vm);
 
 	//vm->funcall = 0;
 
+#ifdef RDEBUG
 	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> RETURN\n");
 	print_vm_info(vm);
 	printf("----\n");
-	
+#endif	
 	//mrbc_pop_callinfo(vm);
 	//自前で復帰
 	vm->pc = org_pc;
@@ -561,7 +563,6 @@ return;
 	vm->current_regs = original_regs;
 
 	SET_RETURN(new_obj); //return self
-#endif
 }
 //================================================================
 /*! (method) instance variable getter
