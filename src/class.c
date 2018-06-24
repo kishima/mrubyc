@@ -23,6 +23,7 @@
 #include "static.h"
 #include "symbol.h"
 #include "console.h"
+#include "opcode.h"
 
 #include "c_array.h"
 #include "c_hash.h"
@@ -437,12 +438,131 @@ static void c_object_class(mrb_vm *vm, mrb_value v[], int argc)
 // Object.new
 static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 {
+#if 0
+	printf("initialize object!\n");
   *v = mrbc_instance_new(vm, v->cls, 0);
   // call "initialize"
   mrbc_funcall(vm, "initialize", v, argc);
+return;
+#else
+	// SENDからは下記のように呼ばれる
+	//    m->func(vm, regs + ra, rc);
+	// v[]にはレジスタがシフトしたものが入っている
+	// C関数コールのときは、push_callinfoが呼ばれていない
+	mrb_value* original_regs = vm->current_regs;
+	vm->current_regs = v;
+	
+	//普通にVM呼ぶと最後まで実行しようとしてしまうので、ABORTで無理矢理中断させることで、ブロックを表現する
+	printf("------------------------------------------------c_object_new argc=%d\n",argc);
+	print_vm_info(vm);
+
+	//v==self
+	mrb_value new_obj = mrbc_instance_new(vm, v->cls, 0);
+
+	char* inifunc = "initialize";
+	
+	mrb_sym sym_id = str_to_symid(inifunc);
+	mrb_proc *m = find_method(vm, new_obj, sym_id);
+	printf("sym_id=%d\n",sym_id);
+	int x=0;
+	for(x=0;x<100;x++){
+		const char* name = mrbc_get_irep_symbol(m->irep->ptr_to_sym,x);
+		if(name==NULL)break;
+		printf("irep symname=%s\n",name);
+	}
+	
+	char symlist[]="XXXXYYinitialize";
+	symlist[0]=0x00;
+	symlist[1]=0x00;
+	symlist[2]=0x00;
+	symlist[3]=0x01;
+
+	symlist[4]=0x00;
+	symlist[5]=0x0a;
+
+	uint32_t code[2] = {
+		//MKOPCODE(OP_CALL) | MKARG_A(argc),
+		//SEND  A B C   R(A) := call(R(A),Syms(B),R(A+1),...,R(A+C))
+		//MKOPCODE(OP_SEND) | MKARG_A(1) | (sym_id << 12) | argc << 7,
+		MKOPCODE(OP_SEND) | MKARG_A(1) | MKARG_B(0) | MKARG_C(argc),
+		MKOPCODE(OP_ABORT)
+	  };
+	mrb_irep irep = {
+		0,     // nlocals
+		0,     // nregs
+		0,     // rlen
+		2,     // ilen
+		0,     // plen
+		(uint8_t *)code,   // iseq
+		NULL,  // pools
+		symlist,  // ptr_to_sym << これがメソッドコールに必要
+		NULL,  // reps
+	};
+
+	//戻るタイミングを覚えておく
+	// adjust reg_top for reg[0]==Proc
+	uint16_t diff = v - vm->regs + 1 + argc;//new methodがつんだ引数の数＋Self？
+	//レジスタのシフト計算の仕方はどうするのが正しいのか？
+
+	//vm->funcall = 0x8000 | vm->callinfo_top;
+	//mrbc_push_callinfo(vm, diff);
+	//mrbc_push_callinfo(vm, argc);
+	//vm->current_regs += v - vm->regs + 1;
+
+	
+	mrb_value* input_regs = vm->current_regs;
+	
+	//vm->current_regs += argc;
+	mrb_irep *org_pc_irep = vm->pc_irep;    // PC
+	uint16_t  org_pc = vm->pc;         // PC
+
+	vm->pc = 0;
+	vm->pc_irep = &irep;//InitializeメソッドのIrep
+	 
+	
+	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> mrbc_vm_run   diff=%d\n",diff);
+	// OP_CALLはレジスタの位置をずらさないで、そのままreg[0].proc->irepをpc_irepに持ってくる
+	// reg[0]にprocオブジェクトが設定されている前提。regs[0]に実行したいprocオブジェクトを置けばOK
+
+	//R0:レシーバ
+	//R1:引数１
+	//R2:?
+	//R3:Self退避
+	//R4:String
+
+	mrb_value *regs = vm->current_regs;
+	mrbc_release(&regs[0]);
+	regs[0] = new_obj;
+	mrbc_dup(&new_obj); //RETURNで参照が減らされるので足しておく
+
+	int n=0;
+	for(n=argc;n>=0;n--){
+		mrbc_release(&regs[n+2]);
+		//printf("copy %d > %d\n",v - vm->regs + n +1,n+1);
+		regs[n+2] = input_regs[n+1];
+		mrbc_dup(&regs[n+1]); //RETURNで参照が減らされる?
+	}
+	regs[1] = new_obj;
+	mrbc_dup(&new_obj); //RETURNで参照が減らされるので足しておく
+	
+	printf("--- run vm\n");
+	mrbc_vm_run(vm);
+
+	//vm->funcall = 0;
+
+	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> RETURN\n");
+	print_vm_info(vm);
+	printf("----\n");
+	
+	//mrbc_pop_callinfo(vm);
+	//自前で復帰
+	vm->pc = org_pc;
+	vm->pc_irep = org_pc_irep;
+	vm->current_regs = original_regs;
+
+	SET_RETURN(new_obj); //return self
+#endif
 }
-
-
 //================================================================
 /*! (method) instance variable getter
  */

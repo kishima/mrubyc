@@ -31,8 +31,10 @@ extern "C" {
 #define GETARG_UNPACK_b(i,n1,n2)    ((((code)) >> (7+(n2))) & (((1<<(n1))-1)))
 
 #define MKOPCODE(op)                ((op & 0x7f)<<24)
-#define MKARG_A(c)                  ((c & 0xff)<<1 | (c & 0x01)>>8)
-
+//#define MKARG_A(c)                  ((c & 0xff)<<1 | (c & 0x01)>>8)
+#define MKARG_A(c)                  ((c & 0x1ff)>>1 | (c & 0x01)<<15)
+#define MKARG_B(c)                  ((c & 0x1fc)<<6 | (c & 0x03)<<22)
+#define MKARG_C(c)                  ((c & 0x7e)<<15 | (c & 0x01)<<31)
 
 #define MAXARG_Bx                   (0xffff)
 #define MAXARG_sBx                  (MAXARG_Bx>>1)
