@@ -455,7 +455,19 @@ static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 	//v==self
 	mrb_value new_obj = mrbc_instance_new(vm, v->cls, 0);
 
-	char* inifunc = "initialize";
+	char symlist[]="______initialize";
+	uint32_to_bin( 1,&symlist[0]);
+	uint16_to_bin(10,&symlist[4]);
+	/*
+	symlist[0]=0x00;
+	symlist[1]=0x00;
+	symlist[2]=0x00;
+	symlist[3]=0x01;
+
+	symlist[4]=0x00;
+	symlist[5]=0x0a;
+   */
+	char* inifunc = &symlist[6];
 	
 	mrb_sym sym_id = str_to_symid(inifunc);
 	mrb_proc *m = find_method(vm, new_obj, sym_id);
@@ -471,20 +483,11 @@ static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 #endif
 	}
 	
-	char symlist[]="XXXXYYinitialize";
-	symlist[0]=0x00;
-	symlist[1]=0x00;
-	symlist[2]=0x00;
-	symlist[3]=0x01;
-
-	symlist[4]=0x00;
-	symlist[5]=0x0a;
-
 	uint32_t code[2] = {
 		//MKOPCODE(OP_CALL) | MKARG_A(argc),
 		//SEND  A B C   R(A) := call(R(A),Syms(B),R(A+1),...,R(A+C))
 		//MKOPCODE(OP_SEND) | MKARG_A(1) | (sym_id << 12) | argc << 7,
-		MKOPCODE(OP_SEND) | MKARG_A(1) | MKARG_B(0) | MKARG_C(argc),
+		MKOPCODE(OP_SEND) | MKARG_A(0) | MKARG_B(0) | MKARG_C(argc),
 		MKOPCODE(OP_ABORT)
 	  };
 	mrb_irep irep = {
@@ -499,20 +502,8 @@ static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 		NULL,  // reps
 	};
 
-	//戻るタイミングを覚えておく
-	// adjust reg_top for reg[0]==Proc
-	uint16_t diff = v - vm->regs + 1 + argc;//new methodがつんだ引数の数＋Self？
-	//レジスタのシフト計算の仕方はどうするのが正しいのか？
-
-	//vm->funcall = 0x8000 | vm->callinfo_top;
-	//mrbc_push_callinfo(vm, diff);
-	//mrbc_push_callinfo(vm, argc);
-	//vm->current_regs += v - vm->regs + 1;
-
-	
 	mrb_value* input_regs = vm->current_regs;
 	
-	//vm->current_regs += argc;
 	mrb_irep *org_pc_irep = vm->pc_irep;    // PC
 	uint16_t  org_pc = vm->pc;         // PC
 
@@ -521,22 +512,16 @@ static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 	 
 	
 #ifdef RDEBUG
-	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> mrbc_vm_run   diff=%d\n",diff);
+	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> mrbc_vm_run   diff=%d\n");
 #endif
-	// OP_CALLはレジスタの位置をずらさないで、そのままreg[0].proc->irepをpc_irepに持ってくる
-	// reg[0]にprocオブジェクトが設定されている前提。regs[0]に実行したいprocオブジェクトを置けばOK
 
-	//R0:レシーバ
-	//R1:引数１
-	//R2:?
-	//R3:Self退避
-	//R4:String
-
+	//R1にSENDのレシーバを起きたいので、1個分右シフト
 	mrb_value *regs = vm->current_regs;
 	mrbc_release(&regs[0]);
 	regs[0] = new_obj;
 	mrbc_dup(&new_obj); //RETURNで参照が減らされるので足しておく
 
+	/*
 	int n=0;
 	for(n=argc;n>=0;n--){
 		mrbc_release(&regs[n+2]);
@@ -545,11 +530,9 @@ static void c_object_new(mrb_vm *vm, mrb_value v[], int argc)
 		mrbc_dup(&regs[n+1]); //RETURNで参照が減らされる?
 	}
 	regs[1] = new_obj;
-	mrbc_dup(&new_obj); //RETURNで参照が減らされるので足しておく
-	
+	mrbc_dup(&new_obj);
+	*/
 	mrbc_vm_run(vm);
-
-	//vm->funcall = 0;
 
 #ifdef RDEBUG
 	printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> c_object_new >>>> RETURN\n");

@@ -36,6 +36,180 @@ static uint32_t free_vm_bitmap[MAX_VM_COUNT / 32 + 1];
 #define FREE_BITMAP_WIDTH 32
 #define Num(n) (sizeof(n)/sizeof((n)[0]))
 
+//#define RDEBUG
+
+static char* ttname[]={
+	"MRB_TT_HANDLE",
+	"MRB_TT_EMPTY",
+	"MRB_TT_NIL",
+	"MRB_TT_FALSE",		// (note) true/false threshold. see op_jmpif
+	"MRB_TT_TRUE",
+	"MRB_TT_FIXNUM",
+	"MRB_TT_FLOAT",
+	"MRB_TT_SYMBOL",
+	"MRB_TT_CLASS",
+	"MRB_TT_OBJECT",
+	"MRB_TT_PROC",
+	"MRB_TT_ARRAY",
+	"MRB_TT_STRING",
+	"MRB_TT_RANGE",
+	"MRB_TT_HASH",
+	"UNKNOWN",
+};
+char* get_tt_name(mrb_vtype tt){
+	switch(tt){
+	  case MRB_TT_HANDLE: return ttname[0]; break;
+	  case MRB_TT_EMPTY: return ttname[1]; break;
+	  case MRB_TT_NIL: return ttname[2]; break;
+	  case MRB_TT_FALSE: return ttname[3]; break;
+	  case MRB_TT_TRUE: return ttname[4]; break;
+	  case MRB_TT_FIXNUM: return ttname[5]; break;
+	  case MRB_TT_FLOAT: return ttname[6]; break;
+	  case MRB_TT_SYMBOL: return ttname[7]; break;
+	  case MRB_TT_CLASS: return ttname[8]; break;
+	  case MRB_TT_OBJECT: return ttname[9]; break;
+	  case MRB_TT_PROC: return ttname[10]; break;
+	  case MRB_TT_ARRAY: return ttname[11]; break;
+	  case MRB_TT_STRING: return ttname[12]; break;
+	  case MRB_TT_RANGE: return ttname[13]; break;
+	  case MRB_TT_HASH: return ttname[14]; break;
+	  default: return ttname[15];
+	}
+}
+
+
+void print_vm_info(mrb_vm *vm){
+#ifndef RDEBUG
+	return;
+#endif
+//	printf("  [VMINFO]irep        =%p\n",vm->irep);
+//	printf("  [VMINFO]pc_irep     =%p\n",vm->pc_irep);
+	printf("  [VMINFO]pc          =%d\n",vm->pc);
+	printf("  [VMINFO]current_regs=%d,%d\n",vm->current_regs - vm->regs, (vm->current_regs - vm->regs)/4 );
+//	printf("  [VMINFO]current_regs=%p\n",vm->current_regs);
+	printf("  [VMINFO]callinfo_top=%d\n",vm->callinfo_top);
+	mrb_class* c = vm->target_class;
+	printf("  [VMINFO]target_class=%s\n",symid_to_str(c->sym_id));
+	//printf("opsend:recver.tt=%s\n",get_tt_name(recv.tt));
+    mrb_value *regs = vm->current_regs;
+	int i=0;
+	for(i=0;i<5;i++){
+		printf("  [VMINFO]current_reg[%d].tt=%s\n",i,get_tt_name(regs[i].tt));
+	}
+	for(i=0;i<7;i++){
+		printf("  [VMINFO]vm.reg[%d].tt=%s\n",i,get_tt_name(vm->regs[i].tt));
+	}
+}
+static char* opcode_name[]={
+"OP_NOP",
+"OP_MOVE",
+"OP_LOADL",
+"OP_LOADI",
+"OP_LOADSYM",
+"OP_LOADNIL",
+"OP_LOADSELF",
+"OP_LOADT",
+"OP_LOADF",
+"OP_GETGLOBAL",
+"OP_SETGLOBAL",
+"OP_GETIV",
+"OP_SETIV",
+"OP_GETCONST",
+"OP_SETCONST",
+"OP_GETUPVAR",
+"OP_SETUPVAR",
+"OP_JMP",
+"OP_JMPIF",
+"OP_JMPNOT",
+"OP_SEND",
+"OP_SENDB",  // reuse
+"OP_CALL",
+"OP_ENTER",
+"OP_RETURN",
+"OP_BLKPUSH",
+"OP_ADD",
+"OP_ADDI",
+"OP_SUB",
+"OP_SUBI",
+"OP_MUL",
+"OP_DIV",
+"OP_EQ",
+"OP_LT",
+"OP_LE",
+"OP_GT",
+"OP_GE",
+"OP_ARRAY",
+"OP_STRING",
+"OP_STRCAT",
+"OP_HASH",
+"OP_LAMBDA",
+"OP_RANGE",
+"OP_CLASS",
+"OP_EXEC",
+"OP_METHOD",
+"OP_TCLASS",
+"OP_STOP",
+"OP_ABORT",  // reuse
+"NOT_SUPPORT"
+};
+char* get_opcode_name(int opcode){
+	int n = 0;
+	switch( opcode ) {
+	  case OP_NOP:        n= 0; break;
+	  case OP_MOVE:       n= 1; break;
+	  case OP_LOADL:      n= 2; break;
+	  case OP_LOADI:      n= 3; break;
+	  case OP_LOADSYM:    n= 4; break;
+	  case OP_LOADNIL:    n= 5; break;
+	  case OP_LOADSELF:   n= 6; break;
+	  case OP_LOADT:      n= 7; break;
+	  case OP_LOADF:      n= 8; break;
+	  case OP_GETGLOBAL:  n= 9; break;
+	  case OP_SETGLOBAL:  n=10; break;
+	  case OP_GETIV:      n=11; break;
+	  case OP_SETIV:      n=12; break;
+	  case OP_GETCONST:   n=13; break;
+	  case OP_SETCONST:   n=14; break;
+	  case OP_GETUPVAR:   n=15; break;
+	  case OP_SETUPVAR:   n=16; break;
+	  case OP_JMP:        n=17; break;
+	  case OP_JMPIF:      n=18; break;
+	  case OP_JMPNOT:     n=19; break;
+	  case OP_SEND:       n=20; break;
+	  case OP_SENDB:      n=21; break;  // reuse
+	  case OP_CALL:       n=22; break;
+	  case OP_ENTER:      n=23; break;
+	  case OP_RETURN:     n=24; break;
+	  case OP_BLKPUSH:    n=25; break;
+	  case OP_ADD:        n=26; break;
+	  case OP_ADDI:       n=27; break;
+	  case OP_SUB:        n=28; break;
+	  case OP_SUBI:       n=29; break;
+	  case OP_MUL:        n=30; break;
+	  case OP_DIV:        n=31; break;
+	  case OP_EQ:         n=32; break;
+	  case OP_LT:         n=33; break;
+	  case OP_LE:         n=34; break;
+	  case OP_GT:         n=35; break;
+	  case OP_GE:         n=36; break;
+	  case OP_ARRAY:      n=37; break;
+	  case OP_STRING:     n=38; break;
+	  case OP_STRCAT:     n=39; break;
+	  case OP_HASH:       n=40; break;
+	  case OP_LAMBDA:     n=41; break;
+	  case OP_RANGE:      n=42; break;
+	  case OP_CLASS:      n=43; break;
+	  case OP_EXEC:       n=44; break;
+	  case OP_METHOD:     n=45; break;
+	  case OP_TCLASS:     n=46; break;
+	  case OP_STOP:       n=47; break;
+	  case OP_ABORT:      n=48; break;  // reuse
+	  default:
+		n=49;
+		break;
+	}
+	return opcode_name[n];
+}
 
 //================================================================
 /*! Number of leading zeros.
@@ -169,7 +343,9 @@ inline static int op_move( mrb_vm *vm, uint32_t code, mrb_value *regs )
 {
   int ra = GETARG_A(code);
   int rb = GETARG_B(code);
-
+#ifdef RDEBUG
+	printf("MOVE R[%d] < R[%d]\n",ra,rb);
+#endif
   mrbc_release(&regs[ra]);
   mrbc_dup(&regs[rb]);
   regs[ra] = regs[rb];
@@ -290,7 +466,9 @@ inline static int op_loadnil( mrb_vm *vm, uint32_t code, mrb_value *regs )
 inline static int op_loadself( mrb_vm *vm, uint32_t code, mrb_value *regs )
 {
   int ra = GETARG_A(code);
-
+#ifdef RDEBUG
+	printf("LOADSELF R[%d] = Self\n",ra);
+#endif
   mrbc_release(&regs[ra]);
   mrbc_dup(&regs[0]);       // TODO: Need?
   regs[ra] = regs[0];
@@ -406,7 +584,9 @@ inline static int op_getiv( mrb_vm *vm, uint32_t code, mrb_value *regs )
 {
   int ra = GETARG_A(code);
   int rb = GETARG_Bx(code);
-
+#ifdef RDEBUG
+	printf("GETIV R[%d] = ivget(Sym[%d])\n",ra,rb);
+#endif
   const char *sym_name = mrbc_get_irep_symbol(vm->pc_irep->ptr_to_sym, rb);
   mrb_sym sym_id = str_to_symid(sym_name+1);	// skip '@'
 
@@ -434,7 +614,9 @@ inline static int op_setiv( mrb_vm *vm, uint32_t code, mrb_value *regs )
 {
   int ra = GETARG_A(code);
   int rb = GETARG_Bx(code);
-
+#ifdef RDEBUG
+	printf("SETIV ivset(Sym[%d],R[%d])\n",rb,ra);
+#endif
   const char *sym_name = mrbc_get_irep_symbol(vm->pc_irep->ptr_to_sym, rb);
   mrb_sym sym_id = str_to_symid(sym_name+1);	// skip '@'
 
@@ -627,8 +809,10 @@ inline static int op_send( mrb_vm *vm, uint32_t code, mrb_value *regs )
   int rb = GETARG_B(code);  // index of method sym
   int rc = GETARG_C(code);  // number of params
   mrb_value recv = regs[ra];
-
-  // Block param
+#ifdef RDEBUG
+	printf("OP_SEND   R(%d) := call(R(%d),Syms(%d),R(%d+1),...,R(%d+%d))\n",ra,ra,rb,ra,ra,rc);
+#endif
+	// Block param
   int bidx = ra + rc + 1;
   switch( GET_OPCODE(code) ) {
   case OP_SEND:
@@ -728,6 +912,9 @@ inline static int op_enter( mrb_vm *vm, uint32_t code, mrb_value *regs )
   uint32_t enter_param = GETARG_Ax(code);
   int def_args = (enter_param >> 13) & 0x1f;  // default args
   int args = (enter_param >> 18) & 0x1f;      // given args
+#ifdef RDEBUG
+	printf("def_args=%d args=%d\n",def_args,args);
+#endif
   if( def_args > 0 ){
     vm->pc += callinfo->n_args - args;
   }
@@ -1773,6 +1960,7 @@ int mrbc_vm_run( mrb_vm *vm )
 
   do {
     // get one bytecode
+    uint32_t cccc = *(uint32_t*)(vm->pc_irep->code + vm->pc * 4);
     uint32_t code = bin_to_uint32(vm->pc_irep->code + vm->pc * 4);
     vm->pc++;
 
@@ -1781,7 +1969,11 @@ int mrbc_vm_run( mrb_vm *vm )
 
     // Dispatch
     int opcode = GET_OPCODE(code);
-    switch( opcode ) {
+#ifdef RDEBUG
+	  print_vm_info(vm);
+	  printf("[OPCODE]%s %08x -> %08x\n",get_opcode_name(opcode),cccc,code);
+#endif	  
+	  switch( opcode ) {
     case OP_NOP:        ret = op_nop       (vm, code, regs); break;
     case OP_MOVE:       ret = op_move      (vm, code, regs); break;
     case OP_LOADL:      ret = op_loadl     (vm, code, regs); break;
