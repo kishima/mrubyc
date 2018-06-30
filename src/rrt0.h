@@ -23,6 +23,8 @@ extern "C" {
 
 /***** Local headers ********************************************************/
 #include "vm.h"
+#include "rrt0.h"
+
 
 /***** Constant values ******************************************************/
 
@@ -81,15 +83,16 @@ typedef struct RMutex {
 
 #define MRBC_MUTEX_INITIALIZER { 0 }
 
+typedef struct mrbc_state_t mrbc_state;
 
 /***** Global variables *****************************************************/
 /***** Function prototypes **************************************************/
 void mrbc_tick(void);
-void mrbc_init(uint8_t *ptr, unsigned int size);
+mrbc_state* mrbc_init(uint8_t *ptr, unsigned int size);
 void mrbc_init_tcb(mrb_tcb *tcb);
-mrb_tcb *mrbc_create_task(const uint8_t *vm_code, mrb_tcb *tcb);
+mrb_tcb *mrbc_create_task(mrbc_state* mrbc, const uint8_t *vm_code, mrb_tcb *tcb);
 int mrbc_start_task(mrb_tcb *tcb);
-int mrbc_run(void);
+int mrbc_run(mrbc_state* mrbc);
 void mrbc_sleep_ms(mrb_tcb *tcb, uint32_t ms);
 void mrbc_relinquish(mrb_tcb *tcb);
 void mrbc_change_priority(mrb_tcb *tcb, int priority);

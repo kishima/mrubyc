@@ -61,11 +61,11 @@ int main(int argc, char *argv[])
       break;
     }
 
-    if( mrbc_create_task( p[i], 0 ) == NULL ) flag_error = 1;
+    if( mrbc_create_task(NULL, p[i], 0 ) == NULL ) flag_error = 1;
   }
 
   if( !flag_error ) {
-    mrbc_run();
+    mrbc_run(NULL);
   }
 
   for ( i=0 ; i<vm_cnt ; i++ ){

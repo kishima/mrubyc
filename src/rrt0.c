@@ -378,7 +378,7 @@ void mrbc_tick(void)
 /*! initialize
 
 */
-void mrbc_init(uint8_t *ptr, unsigned int size )
+mrbc_state* mrbc_init(uint8_t *ptr, unsigned int size )
 {
   mrbc_init_alloc(ptr, size);
   init_static();
@@ -431,7 +431,7 @@ void mrbc_init_tcb(mrb_tcb *tcb)
   @retval       NULL is error.
 
 */
-mrb_tcb* mrbc_create_task(const uint8_t *vm_code, mrb_tcb *tcb)
+mrb_tcb* mrbc_create_task(mrbc_state* mrbc,const uint8_t *vm_code, mrb_tcb *tcb)
 {
   // allocate Task Control Block
   if( tcb == NULL ) {
@@ -500,7 +500,7 @@ int mrbc_start_task(mrb_tcb *tcb)
 /*! execute
 
 */
-int mrbc_run(void)
+int mrbc_run(mrbc_state* mrbc)
 {
   while( 1 ) {
     mrb_tcb *tcb = q_ready_;

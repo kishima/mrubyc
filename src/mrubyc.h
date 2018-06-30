@@ -34,4 +34,6 @@
 #include "console.h"
 #include "rrt0.h"
 
+#include "state.h"
+
 #endif
