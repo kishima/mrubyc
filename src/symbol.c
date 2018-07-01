@@ -26,6 +26,7 @@
 #include "c_array.h"
 #include "console.h"
 
+#define MRBC_SYMBOL_SEARCH_LINER
 
 #if !defined(MRBC_SYMBOL_SEARCH_LINER) && !defined(MRBC_SYMBOL_SEARCH_BTREE)
 #define MRBC_SYMBOL_SEARCH_BTREE
@@ -61,6 +62,11 @@ static int search_index( uint16_t hash, const char *str )
       return i;
     }
   }
+	if(*str=='x'){
+		for( i = 0; i < sym_index_pos; i++ ) {
+			printf("sym_index[%d](%s)=%04x\n",i,sym_index[i].cstr,sym_index[i].hash);
+		}
+	}
   return -1;
 #endif
 
@@ -180,10 +186,16 @@ uint16_t calc_hash(const char *str)
 mrb_sym str_to_symid(const char *str)
 {
   uint16_t h = calc_hash(str);
+	printf("[%04x]",h);
   mrb_sym sym_id = search_index(h, str);
-  if( sym_id >= 0 ) return sym_id;
-
-  return add_index( h, str );
+	if( sym_id >= 0 ){
+		printf("str_to_sym:%s->%d\n",str,sym_id);
+		return sym_id;
+	}else{
+		sym_id=add_index( h, str );
+		printf("str_to_sym:%s->%d (new)\n",str,sym_id);
+	}
+  return sym_id;
 }
 
 

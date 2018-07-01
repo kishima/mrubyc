@@ -656,7 +656,7 @@ inline static int op_send( mrb_vm *vm, uint32_t code, mrb_value *regs )
   mrb_proc *m = find_method(vm, recv, sym_id);
 
   if( m == 0 ) {
-    console_printf("No method. vtype=%d method='%s'\n", recv.tt, sym_name);
+    console_printf("No method. vtype=%d method='%s' sym_id=%d\n", recv.tt, sym_name,sym_id);
     return 0;
   }
 
@@ -1570,6 +1570,8 @@ inline static int op_method( mrb_vm *vm, uint32_t code, mrb_value *regs )
     const char *sym_name = mrbc_get_irep_symbol(cur_irep->ptr_to_sym, rb);
     int sym_id = str_to_symid(sym_name);
 
+	  printf("new method target_class symid=%d\n",cls->sym_id);
+	  printf("new method name,symid=%s,%d\n",sym_name,sym_id);
     // check same name method
     mrb_proc *p = cls->procs;
     void *pp = &cls->procs;
@@ -1642,16 +1644,26 @@ inline static int op_tclass( mrb_vm *vm, uint32_t code, mrb_value *regs )
 */
 inline static int op_stop( mrb_vm *vm, uint32_t code, mrb_value *regs )
 {
-  if( GET_OPCODE(code) == OP_STOP ) {
-    int i;
-    for( i = 0; i < MAX_REGS_SIZE; i++ ) {
-      mrbc_release(&vm->regs[i]);
-    }
-  }
-
-  vm->flag_preemption = 1;
-  
-  return -1;
+	if( GET_OPCODE(code) == OP_STOP ) {
+		if(vm->callinfo_top!=0){
+			printf("OP_STOP:clear\n");
+			int i;
+			for( i = 0; i < MAX_REGS_SIZE; i++ ) {
+				mrbc_release(&vm->regs[i]);
+			}
+		}else{
+			printf("OP_STOP:skip\n");
+			/*
+			mrbc_release(&vm->regs[0]);
+			vm->regs[0]=vm->regs[1];
+			dup(&vm->regs[0]);
+			  */
+		}
+	}
+	
+	vm->flag_preemption = 1;
+	
+	return -1;
 }
 
 

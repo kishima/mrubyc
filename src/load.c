@@ -12,6 +12,7 @@
 */
 
 #include "vm_config.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -101,6 +102,7 @@ static int load_header(mrb_vm *vm, const uint8_t **pos)
 static mrb_irep * load_irep_1(mrb_vm *vm, const uint8_t **pos)
 {
   const uint8_t *p = *pos + 4;			// skip record size
+  printf("load_irep_1 pos=%p:%p\n",pos,*pos);
 
   // new irep
   mrb_irep *irep = mrbc_irep_alloc(0);
@@ -115,7 +117,12 @@ static mrb_irep * load_irep_1(mrb_vm *vm, const uint8_t **pos)
   irep->rlen = bin_to_uint16(p);	p += 2;
   irep->ilen = bin_to_uint32(p);	p += 4;
 
+  printf("nlocals=%d\n",irep->nlocals);
+  printf("nregs=%d\n",irep->nregs);
+  printf("rlen=%d\n",irep->rlen);
+  printf("ilen=%d\n",irep->ilen);
   // padding
+  printf("padding=%d\n",(vm->mrb - p) & 0x03);
   p += (vm->mrb - p) & 0x03;
 
   // allocate memory for child irep's pointers
@@ -205,6 +212,7 @@ static mrb_irep * load_irep_1(mrb_vm *vm, const uint8_t **pos)
 */
 static mrb_irep * load_irep_0(mrb_vm *vm, const uint8_t **pos)
 {
+  printf("load_irep_0 pos=%p:%p\n",pos,*pos);
   mrb_irep *irep = load_irep_1(vm, pos);
   if( !irep ) return NULL;
 
@@ -240,11 +248,15 @@ static int load_irep(mrb_vm *vm, const uint8_t **pos)
   p += 4;
   if( memcmp(p, "0000", 4) != 0 ) {		// rite version
     vm->error_code = LOAD_FILE_IREP_ERROR_VERSION;
+	  printf("err1\n");
+	  printf("%02x %02x %02x %02x\n",p[0],p[1],p[2],p[3]);
+	  
     return -1;
   }
   p += 4;
   vm->irep = load_irep_0(vm, &p);
   if( vm->irep == NULL ) {
+	  printf("err2\n");
     return -1;
   }
 
